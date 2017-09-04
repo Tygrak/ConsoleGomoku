@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Gomoku{
     class AI{
         public static Random rand = new Random();
+        private object locker = new Object();
+        private List<KeyValuePair<int, int>> results = new List<KeyValuePair<int, int>>();
         
         public AI(){
         }
@@ -155,17 +158,19 @@ namespace Gomoku{
             return alpha;
         }
 
-        public int RootAlphaBeta(int alpha, int beta, Board b, int depth){
-            Board bCopy = b;
+        public int RootAlphaBeta(int alpha, int beta, Board board, int depth){
+            Stopwatch s = new Stopwatch();
+            s.Start();
+            Board bCopy = board;
             int[] moves = bCopy.GetInterestingMoves();
             if(moves.Length == 0){
-                return (b.width*b.width)/2;
+                return (board.width*board.width)/2;
             }
             int bestId = 0;
-            int color = b.blackTurn ? 1 : -1;
+            int color = board.blackTurn ? 1 : -1;
             string deb = "";
             for(int i = 0; i < moves.Length; i++){
-                bCopy = new Board(b);
+                bCopy = new Board(board);
                 bCopy.ChangeSquare(moves[i]);
                 bCopy.EndTurn();
                 int score = -AlphaBeta(-beta, -alpha, bCopy, depth-1, color);
@@ -175,8 +180,87 @@ namespace Gomoku{
                     deb += "Move: " + moves[i].ToString() + " has value " + score.ToString() + ".\n  ";
                 }
             }
-            b.DebugWrite(deb);
+            s.Stop();
+            deb += "\n\n  Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds.";
+            board.DebugWrite(deb);
             return moves[bestId];
+        }
+
+        public void AlphaBetaFromMoves(Board board, int depth, int[] moves){
+            if(moves.Length == 0){
+                lock(locker){
+                    results.Add(new KeyValuePair<int, int>(-1, -1));
+                }
+                return;
+            }
+            int alpha = int.MinValue;
+            int beta = int.MaxValue;
+            Board bCopy = board;
+            int bestId = 0;
+            int color = board.blackTurn ? 1 : -1;
+            for(int i = 0; i < moves.Length; i++){
+                bCopy = new Board(board);
+                bCopy.ChangeSquare(moves[i]);
+                bCopy.EndTurn();
+                int score = -AlphaBeta(-beta, -alpha, bCopy, depth-1, color);
+                if(score > alpha){
+                    alpha = score; 
+                    bestId = i;
+                }
+            }
+            lock(locker){
+                results.Add(new KeyValuePair<int, int>(moves[bestId], alpha));
+            }
+        }
+
+        public int MultiThreadedRAlphaBeta(Board board, int depth, int maxThreadNum){
+            Stopwatch s = new Stopwatch();
+            s.Start();
+            Queue<int> moves = new Queue<int>(board.GetInterestingMoves());
+            int moveNum = moves.Count;
+            if(moves.Count == 0){
+                return (board.width*board.width)/2;
+            }
+            int bestMove = 0;
+            int alpha = int.MinValue;
+            int color = board.blackTurn ? 1 : -1;
+            string deb = "";
+            int threadNum = 4;
+            for (int i = maxThreadNum; i >= 3; i--){
+                if(moves.Count%i == 0){
+                    threadNum = i;
+                    break;
+                }
+            }
+            Thread[] threads = new Thread[threadNum];
+            results.Clear();
+            for(int i = 0; i < threadNum; i++){
+                int[] threadMoves;
+                if(moves.Count > moveNum/threadNum){
+                    threadMoves = new int[moveNum/threadNum];
+                } else{
+                    threadMoves = new int[moves.Count];
+                }
+                for (int j = 0; j < threadMoves.Length; j++){
+                    threadMoves[j] = moves.Dequeue();
+                }
+                threads[i] = new Thread(() => {AlphaBetaFromMoves(board, depth, threadMoves);});
+                threads[i].Start();
+            }
+            for(int i = 0; i < threadNum; i++){
+                threads[i].Join();
+            }
+            for(int i = 0; i < threadNum; i++){
+                deb += "Move: " + results[i].Key.ToString() + " has value " + results[i].Value.ToString() + ".\n  ";
+                if(results[i].Value > alpha && results[i].Key != -1){
+                    bestMove = results[i].Key;
+                    alpha = results[i].Value;
+                }
+            }
+            s.Stop();
+            deb += "\n\n  Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds.";
+            board.DebugWrite(deb);
+            return bestMove;
         }
 
         public int EvaluateBoard(Board state){

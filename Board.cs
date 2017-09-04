@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Gomoku{
     class Board{
         public bool blackTurn;
         private bool blackIsPlayer = false;
-        private bool whiteIsPlayer = true;
         private int blackBotTimer = 10;
+        private bool blackBotUsesAlphaBeta = true;
+        private bool whiteIsPlayer = true;
         private int whiteBotTimer = 10;
+        private bool whiteBotUsesAlphaBeta = true;
         private AI ai = new AI();
+        private int lastMove = -1;
         public int width;
         public int[] board;
 
@@ -30,6 +34,9 @@ namespace Gomoku{
         }
 
         public void StartLoop(){
+            Stopwatch s = new Stopwatch();
+            s.Start();
+            int turn = 0;
             lastSquare = 0;
             while(true){
                 DrawBoard(lastSquare);
@@ -38,11 +45,19 @@ namespace Gomoku{
                 } else{
                     //lastSquare = ai.GetHighestValueMove(this);
                     if(blackTurn){
-                        //lastSquare = ai.RootAlphaBeta(int.MinValue, int.MaxValue, this, 2);
-                        //lastSquare = ai.MonteCarloSearch(this, blackBotTimer);
+                        if(blackBotUsesAlphaBeta){
+                            lastSquare = ai.MultiThreadedRAlphaBeta(this, 4, 8);
+                            //lastSquare = ai.RootAlphaBeta(int.MinValue, int.MaxValue, this, 4);
+                        } else{
+                            lastSquare = ai.MonteCarloSearch(this, blackBotTimer);
+                        }
                     } else{
-                        //lastSquare = ai.MonteCarloSearch(this, whiteBotTimer);
-                        lastSquare = ai.RootAlphaBeta(int.MinValue, int.MaxValue, this, 4);
+                        if(whiteBotUsesAlphaBeta){
+                            lastSquare = ai.MultiThreadedRAlphaBeta(this, 4, 8);
+                            //lastSquare = ai.RootAlphaBeta(int.MinValue, int.MaxValue, this, 4);
+                        } else{
+                            lastSquare = ai.MonteCarloSearch(this, whiteBotTimer);
+                        }
                     }
                 }
                 if(board[lastSquare] == 0 || board[lastSquare] == 3){
@@ -54,6 +69,12 @@ namespace Gomoku{
                         WriteEndText(win);
                         UserPromptEnd();
                     }
+                    turn++;
+                    /*if(turn == 25){
+                        s.Stop();
+                        DebugWrite("Time to simulate 25 turns in miliseconds: " + s.ElapsedMilliseconds);
+                        UserPromptEnd();
+                    }*/
                     EndTurn();
                 }
             }
@@ -191,6 +212,7 @@ namespace Gomoku{
         }
 
         public void ChangeSquare(int position){
+            lastMove = position;
             board[position] = blackTurn ? 1 : 2;
         }
 
