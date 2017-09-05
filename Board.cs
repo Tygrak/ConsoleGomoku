@@ -11,6 +11,7 @@ namespace Gomoku{
         private bool whiteIsPlayer = true;
         private int whiteBotTimer = 10;
         private bool whiteBotUsesAlphaBeta = true;
+        private bool wideningSpacesMode = false;
         private AI ai = new AI();
         private int lastMove = -1;
         public int width;
@@ -85,6 +86,9 @@ namespace Gomoku{
             string columnLabels = "    ";
             for (int i = 0; i < width; i++){
                 columnLabels += (char) ('a' + i);
+                if(wideningSpacesMode){
+                    columnLabels += " ";
+                }
             }
             Console.WriteLine(columnLabels);
             for (int i = 0; i < width; i++){
@@ -100,12 +104,20 @@ namespace Gomoku{
                     } else{
                         Console.Write("T");
                     }
+                    if(wideningSpacesMode){
+                        Console.Write(" ");
+                    }
                 }
             }
             Console.WriteLine();
             Console.WriteLine();
-            Console.SetCursorPosition(4+ColumnFromPosition(cursorPosition),
+            if(wideningSpacesMode){
+                Console.SetCursorPosition(4+ColumnFromPosition(cursorPosition)*2,
                                          2+RowFromPosition(cursorPosition));
+            } else{
+                Console.SetCursorPosition(4+ColumnFromPosition(cursorPosition),
+                                         2+RowFromPosition(cursorPosition));
+            }
         }
 
         public int UserSelectSquare(){
@@ -118,19 +130,39 @@ namespace Gomoku{
             } else if(key == ConsoleKey.DownArrow && Console.CursorTop < width+1){
                 Console.CursorTop += 1;
             } else if(key == ConsoleKey.LeftArrow && Console.CursorLeft > 4){
-                Console.CursorLeft -= 1;
-            } else if(key == ConsoleKey.RightArrow && Console.CursorLeft < width+3){
-                Console.CursorLeft += 1;
+                if(wideningSpacesMode){
+                    Console.CursorLeft -= 2;
+                } else{
+                    Console.CursorLeft -= 1;
+                }
+            } else if((key == ConsoleKey.RightArrow && Console.CursorLeft < width*2+2 && wideningSpacesMode) 
+                        || (key == ConsoleKey.RightArrow && Console.CursorLeft < width+3)){
+                if(wideningSpacesMode){
+                    Console.CursorLeft += 2;
+                } else{
+                    Console.CursorLeft += 1;
+                }
             }
             int cLeftPos = Console.CursorLeft;
             int cTopPos  = Console.CursorTop;
-            Console.SetCursorPosition(width+6, 0);
-            Console.Write((cLeftPos-4+(cTopPos-2)*width).ToString("000"));
-            Console.SetCursorPosition(width+6, 1);
-            Console.Write((char) ('a' + cLeftPos-4) + (cTopPos-1).ToString("00"));
+            if(wideningSpacesMode){
+                Console.SetCursorPosition(width*2+6, 0);
+                Console.Write(((cLeftPos-4)/2+(cTopPos-2)*width).ToString("000"));
+                Console.SetCursorPosition(width*2+6, 1);
+                Console.Write((char) ('a' + (cLeftPos-4)/2) + (cTopPos-1).ToString("00"));
+            } else{
+                Console.SetCursorPosition(width+6, 0);
+                Console.Write((cLeftPos-4+(cTopPos-2)*width).ToString("000"));
+                Console.SetCursorPosition(width+6, 1);
+                Console.Write((char) ('a' + cLeftPos-4) + (cTopPos-1).ToString("00"));
+            }
             Console.SetCursorPosition(cLeftPos, cTopPos);
             if(key == ConsoleKey.Enter){
-                return Console.CursorLeft-4+(Console.CursorTop-2)*width;
+                if(wideningSpacesMode){
+                    return (cLeftPos-4)/2+(Console.CursorTop-2)*width;
+                } else{
+                    return Console.CursorLeft-4+(Console.CursorTop-2)*width;
+                }
                 //return (Console.CursorTop-2)*width+Console.CursorLeft-4;
             } else{
                 return UserSelectSquare();

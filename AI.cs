@@ -186,6 +186,7 @@ namespace Gomoku{
             return moves[bestId];
         }
 
+
         public void AlphaBetaFromMoves(Board board, int depth, int[] moves){
             if(moves.Length == 0){
                 lock(locker){
@@ -216,7 +217,8 @@ namespace Gomoku{
         public int MultiThreadedRAlphaBeta(Board board, int depth, int maxThreadNum){
             Stopwatch s = new Stopwatch();
             s.Start();
-            Queue<int> moves = new Queue<int>(board.GetInterestingMoves());
+            Queue<int> moves = new Queue<int>(FindMoves(board));
+            //Queue<int> moves = new Queue<int>(board.GetInterestingMoves());
             int moveNum = moves.Count;
             if(moves.Count == 0){
                 return (board.width*board.width)/2;
@@ -258,7 +260,7 @@ namespace Gomoku{
                 }
             }
             s.Stop();
-            deb += "\n\n  Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds.";
+            deb += "\n\n  Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds for " + moveNum + " moves. (defMoves):" + board.GetInterestingMoves().Length;
             board.DebugWrite(deb);
             return bestMove;
         }
@@ -282,6 +284,52 @@ namespace Gomoku{
             return value;
         }
 
+        public int[] FindMoves(Board state){
+            List<int> moves = new List<int>(state.GetInterestingMoves());
+            //Go through the moves and remove the real bad ones
+            for (int i = moves.Count-1; i >= 0; i--){
+                Board copy = new Board(state);
+                copy.ChangeSquare(moves[i]);
+                int row = InRow(state, moves[i], 1, 0);
+                row += InRow(state, moves[i], 0, 1);
+                row += InRow(state, moves[i], 1, 1);
+                row += InRow(state, moves[i], -1, 1);
+                if(row < 2){
+                    moves.Remove(row);
+                }
+            }
+            return moves.ToArray();
+        }
+
+        //TODO: Create function that finds new moves in row created by last move.
+        /*public int[] FindMovesInRow(Board state, int pos, int dirX, int dirY){
+            int inRow = 1;
+            List<int> moves = new List<int>(state.GetInterestingMoves());
+            int c = state.board[pos];
+            while(state.ColumnFromPosition(pos)-dirX >= 0 && state.ColumnFromPosition(pos)-dirX < state.width
+                     && state.RowFromPosition(pos)-dirY >= 0 && state.RowFromPosition(pos)-dirY < state.width
+                     && state.board[pos-dirX-(dirY*state.width)] == c){
+                pos = pos-dirX-(dirY*state.width);
+            }
+            if(state.ColumnFromPosition(pos)-dirX < 0 || state.ColumnFromPosition(pos)-dirX >= state.width
+                     || state.RowFromPosition(pos)-dirY < 0 || state.RowFromPosition(pos)-dirY >= state.width
+                     || (state.board[pos-dirX-(dirY*state.width)] != c && state.board[pos-dirX-(dirY*state.width)] != 0)){
+                moves.Add;
+            }
+            while(state.ColumnFromPosition(pos)+dirX >= 0 && state.ColumnFromPosition(pos)+dirX < state.width
+                     && state.RowFromPosition(pos)+dirY >= 0 && state.RowFromPosition(pos)+dirY < state.width
+                     && state.board[pos+dirX+(dirY*state.width)] == c){
+                pos = pos+dirX+(dirY*state.width);
+                inRow++;
+            }
+            if(state.ColumnFromPosition(pos)+dirX < 0 || state.ColumnFromPosition(pos)+dirX >= state.width
+                     || state.RowFromPosition(pos)+dirY < 0 || state.RowFromPosition(pos)+dirY >= state.width
+                     || (state.board[pos+dirX+(dirY*state.width)] != c && state.board[pos+dirX+(dirY*state.width)] != 0)){
+                blocks++;
+            }
+            
+        }*/
+
         public int InRow(Board state, int pos, int dirX, int dirY){
             int inRow = 1;
             int blocks = 0;
@@ -289,7 +337,7 @@ namespace Gomoku{
             while(state.ColumnFromPosition(pos)-dirX >= 0 && state.ColumnFromPosition(pos)-dirX < state.width
                      && state.RowFromPosition(pos)-dirY >= 0 && state.RowFromPosition(pos)-dirY < state.width
                      && state.board[pos-dirX-(dirY*state.width)] == c){
-                pos = pos-dirX-(dirY*state.width);            
+                pos = pos-dirX-(dirY*state.width);
             }
             if(state.ColumnFromPosition(pos)-dirX < 0 || state.ColumnFromPosition(pos)-dirX >= state.width
                      || state.RowFromPosition(pos)-dirY < 0 || state.RowFromPosition(pos)-dirY >= state.width
