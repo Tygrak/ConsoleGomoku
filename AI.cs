@@ -186,6 +186,44 @@ namespace Gomoku{
             return moves[bestId];
         }
 
+        public int AlphaBetaOptimized(int alpha, int beta, Board b, int depth, int color, List<int> movesLast){
+            Board bCopy = b;
+            if(depth == 0){
+                return EvaluateBoard(bCopy) * color;
+            }
+            List<int> moves;
+            if(movesLast != null){
+                moves = movesLast;
+            } else{
+                moves = new List<int>(bCopy.GetInterestingMoves());
+            }
+            for(int i = 0; i < moves.Count; i++){
+                bCopy = new Board(b);
+                if(bCopy.board[moves[i]] != 0){
+                    continue;
+                }
+                bCopy.ChangeSquare(moves[i]);
+                color = bCopy.blackTurn ? -1 : 1;
+                int value = EvaluateBoard(bCopy)*color;
+                if(value > 9000){
+                    return -value*depth;
+                } else if(value < -9000){
+                    return -value*depth;
+                }
+                bCopy.EndTurn();
+                List<int> movesCopy = new List<int>(moves);
+                int[] movesToAdd = FindNewMoves(bCopy, bCopy.lastMove);
+                for (int j = 0; j < movesToAdd.Length; j++){
+                    if(!movesCopy.Contains(movesToAdd[j])){
+                        movesCopy.Add(movesToAdd[j]);
+                    }
+                }
+                int score = -AlphaBetaOptimized(-beta, -alpha, bCopy, depth-1, color, movesCopy);
+                if(beta != -2147483648 && score >= beta) return beta;
+                if(score > alpha) alpha = score;
+            }
+            return alpha;
+        }
 
         public void AlphaBetaFromMoves(Board board, int depth, int[] moves){
             if(moves.Length == 0){
@@ -203,7 +241,12 @@ namespace Gomoku{
                 bCopy = new Board(board);
                 bCopy.ChangeSquare(moves[i]);
                 bCopy.EndTurn();
-                int score = -AlphaBeta(-beta, -alpha, bCopy, depth-1, color);
+                int score;
+                if(depth > 5){
+                    score = -AlphaBetaOptimized(-beta, -alpha, bCopy, depth-1, color, null);
+                } else{
+                    score = -AlphaBeta(-beta, -alpha, bCopy, depth-1, color);
+                }
                 if(score > alpha){
                     alpha = score; 
                     bestId = i;
@@ -222,16 +265,22 @@ namespace Gomoku{
             int moveNum = moves.Count;
             if(moves.Count == 0){
                 return (board.width*board.width)/2;
+            } else if(moves.Count == 1){
+                return moves.Dequeue();
             }
             int bestMove = 0;
             int alpha = int.MinValue;
             int color = board.blackTurn ? 1 : -1;
             string deb = "";
             int threadNum = 4;
-            for (int i = maxThreadNum; i >= 3; i--){
-                if(moves.Count%i == 0){
-                    threadNum = i;
-                    break;
+            if(moves.Count <= 3){
+                threadNum = 1;
+            } else{
+                for (int i = maxThreadNum; i >= 4; i--){
+                    if(moves.Count%i == 0){
+                        threadNum = i;
+                        break;
+                    }
                 }
             }
             Thread[] threads = new Thread[threadNum];
@@ -260,7 +309,8 @@ namespace Gomoku{
                 }
             }
             s.Stop();
-            deb += "\n\n  Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds for " + moveNum + " moves. (defMoves):" + board.GetInterestingMoves().Length;
+            deb += "\n\n  Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds for " + moveNum + " moves. (defmoves) = " + board.GetInterestingMoves().Length;
+            //deb += "\n\n After last move FindNewMoves found " + FindNewMoves(board, board.lastMove).Length + " new moves.";
             board.DebugWrite(deb);
             return bestMove;
         }
@@ -289,32 +339,62 @@ namespace Gomoku{
             //Go through the moves and remove the real bad ones
             for (int i = moves.Count-1; i >= 0; i--){
                 Board copy = new Board(state);
+                int alpha = int.MinValue;
+                int beta = int.MaxValue;
                 copy.ChangeSquare(moves[i]);
-                int row = InRow(state, moves[i], 1, 0);
-                row += InRow(state, moves[i], 0, 1);
-                row += InRow(state, moves[i], 1, 1);
-                row += InRow(state, moves[i], -1, 1);
-                if(row < 2){
-                    moves.Remove(row);
+                copy.EndTurn();
+                int color = copy.blackTurn ? 1 : -1;
+                int value = AlphaBeta(alpha, beta, copy, 2, color);
+                //Console.WriteLine("move " + moves[i] + " val " + value);
+                //Console.Read();
+                if(value > 5000){
+                    moves.RemoveAt(i);
+                } else if(value < -5000){
+                    state.DebugWrite("Winning move " + moves[i] + " found!");
+                    return new int[]{moves[i]};
                 }
+            }
+            if(moves.Count == 0){
+                return state.GetInterestingMoves();
+            }
+            return moves.ToArray();
+        }
+
+        public int[] FindNewMoves(Board state, int lastMove){
+            List<int> moves = new List<int>();
+            int[] rowMoves = FindMovesInRow(state, lastMove, 1, 0);
+            for (int i = 0; i < rowMoves.Length; i++){
+                moves.Add(rowMoves[i]);
+            }
+            rowMoves = FindMovesInRow(state, lastMove, 0, 1);
+            for (int i = 0; i < rowMoves.Length; i++){
+                moves.Add(rowMoves[i]);
+            }
+            rowMoves = FindMovesInRow(state, lastMove, 1, 1);
+            for (int i = 0; i < rowMoves.Length; i++){
+                moves.Add(rowMoves[i]);
+            }
+            rowMoves = FindMovesInRow(state, lastMove, -1, 1);
+            for (int i = 0; i < rowMoves.Length; i++){
+                moves.Add(rowMoves[i]);
             }
             return moves.ToArray();
         }
 
         //TODO: Create function that finds new moves in row created by last move.
-        /*public int[] FindMovesInRow(Board state, int pos, int dirX, int dirY){
+        public int[] FindMovesInRow(Board state, int pos, int dirX, int dirY){
             int inRow = 1;
-            List<int> moves = new List<int>(state.GetInterestingMoves());
+            List<int> moves = new List<int>();
             int c = state.board[pos];
             while(state.ColumnFromPosition(pos)-dirX >= 0 && state.ColumnFromPosition(pos)-dirX < state.width
                      && state.RowFromPosition(pos)-dirY >= 0 && state.RowFromPosition(pos)-dirY < state.width
                      && state.board[pos-dirX-(dirY*state.width)] == c){
                 pos = pos-dirX-(dirY*state.width);
             }
-            if(state.ColumnFromPosition(pos)-dirX < 0 || state.ColumnFromPosition(pos)-dirX >= state.width
-                     || state.RowFromPosition(pos)-dirY < 0 || state.RowFromPosition(pos)-dirY >= state.width
-                     || (state.board[pos-dirX-(dirY*state.width)] != c && state.board[pos-dirX-(dirY*state.width)] != 0)){
-                moves.Add;
+            if(state.ColumnFromPosition(pos)-dirX >= 0 && state.ColumnFromPosition(pos)-dirX < state.width
+                     && state.RowFromPosition(pos)-dirY >= 0 && state.RowFromPosition(pos)-dirY < state.width
+                     && state.board[pos-dirX-(dirY*state.width)] == 0){
+                moves.Add(pos-dirX-(dirY*state.width));
             }
             while(state.ColumnFromPosition(pos)+dirX >= 0 && state.ColumnFromPosition(pos)+dirX < state.width
                      && state.RowFromPosition(pos)+dirY >= 0 && state.RowFromPosition(pos)+dirY < state.width
@@ -322,13 +402,17 @@ namespace Gomoku{
                 pos = pos+dirX+(dirY*state.width);
                 inRow++;
             }
-            if(state.ColumnFromPosition(pos)+dirX < 0 || state.ColumnFromPosition(pos)+dirX >= state.width
-                     || state.RowFromPosition(pos)+dirY < 0 || state.RowFromPosition(pos)+dirY >= state.width
-                     || (state.board[pos+dirX+(dirY*state.width)] != c && state.board[pos+dirX+(dirY*state.width)] != 0)){
-                blocks++;
+            if(state.ColumnFromPosition(pos)+dirX >= 0 && state.ColumnFromPosition(pos)+dirX < state.width
+                     && state.RowFromPosition(pos)+dirY >= 0 && state.RowFromPosition(pos)+dirY < state.width
+                     && state.board[pos+dirX+(dirY*state.width)] == 0){
+                moves.Add(pos+dirX+(dirY*state.width));
             }
-            
-        }*/
+            if(inRow >= 3){
+                return moves.ToArray();
+            } else{
+                return new int[0];
+            }
+        }
 
         public int InRow(Board state, int pos, int dirX, int dirY){
             int inRow = 1;

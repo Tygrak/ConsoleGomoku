@@ -13,7 +13,7 @@ namespace Gomoku{
         private bool whiteBotUsesAlphaBeta = true;
         private bool wideningSpacesMode = false;
         private AI ai = new AI();
-        private int lastMove = -1;
+        public int lastMove = -1;
         public int width;
         public int[] board;
 
@@ -38,7 +38,7 @@ namespace Gomoku{
             Stopwatch s = new Stopwatch();
             s.Start();
             int turn = 0;
-            lastSquare = 0;
+            lastSquare = (width*width)/2;
             while(true){
                 DrawBoard(lastSquare);
                 if((blackTurn && blackIsPlayer) || (!blackTurn && whiteIsPlayer)){
@@ -71,7 +71,7 @@ namespace Gomoku{
                         UserPromptEnd();
                     }
                     turn++;
-                    /*if(turn == 25){
+                    /*if(turn == 10){
                         s.Stop();
                         DebugWrite("Time to simulate 25 turns in miliseconds: " + s.ElapsedMilliseconds);
                         UserPromptEnd();
