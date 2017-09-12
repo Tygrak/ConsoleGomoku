@@ -96,10 +96,13 @@ namespace Gomoku{
                 Console.Write((i+1).ToString("00") + "  ");
                 for (int j = 0; j < width; j++){
                     if(board[i*width+j] == 0){
+                        Console.ResetColor();
                         Console.Write("-");
                     } else if(board[i*width+j] == 1){
+                        Console.ForegroundColor = ConsoleColor.Red;
                         Console.Write("X");
                     } else if(board[i*width+j] == 2){
+                        Console.ForegroundColor = ConsoleColor.Blue;
                         Console.Write("O");
                     } else{
                         Console.Write("T");
@@ -272,9 +275,15 @@ namespace Gomoku{
             DrawBoard();
             Console.SetCursorPosition(2, 3+width);
             if(won == 1){
-                Console.WriteLine("X won!");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write("X");
+                Console.ResetColor();
+                Console.WriteLine(" won!");
             } else if(won == 2){
-                Console.WriteLine("O won!");
+                Console.ForegroundColor = ConsoleColor.Blue;
+                Console.Write("O");
+                Console.ResetColor();
+                Console.WriteLine(" won!");
             } else if(won == -1){
                 Console.WriteLine("Stalemate!");
             }

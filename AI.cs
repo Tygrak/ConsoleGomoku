@@ -260,12 +260,18 @@ namespace Gomoku{
         public int MultiThreadedRAlphaBeta(Board board, int depth, int maxThreadNum){
             Stopwatch s = new Stopwatch();
             s.Start();
-            Queue<int> moves = new Queue<int>(FindMoves(board));
+            Queue<int> moves;
+            if(depth > 4){
+                moves = new Queue<int>(FindMoves(board, 3));
+            } else{
+                moves = new Queue<int>(board.GetInterestingMoves());
+            }
             //Queue<int> moves = new Queue<int>(board.GetInterestingMoves());
             int moveNum = moves.Count;
             if(moves.Count == 0){
                 return (board.width*board.width)/2;
             } else if(moves.Count == 1){
+                board.DebugWrite("Execution took " + s.ElapsedMilliseconds.ToString() + " miliseconds for " + moveNum + " move. (defmoves) = " + board.GetInterestingMoves().Length);
                 return moves.Dequeue();
             }
             int bestMove = 0;
@@ -273,8 +279,10 @@ namespace Gomoku{
             int color = board.blackTurn ? 1 : -1;
             string deb = "";
             int threadNum = 4;
-            if(moves.Count <= 3){
-                threadNum = 1;
+            if(moves.Count <= 4){
+                threadNum = moves.Count;
+            } else if(moves.Count >= 32){
+                threadNum = maxThreadNum-2 > 4 ? maxThreadNum-2 : 4;
             } else{
                 for (int i = maxThreadNum; i >= 4; i--){
                     if(moves.Count%i == 0){
@@ -334,7 +342,7 @@ namespace Gomoku{
             return value;
         }
 
-        public int[] FindMoves(Board state){
+        public int[] FindMoves(Board state, int additionalDepth){
             List<int> moves = new List<int>(state.GetInterestingMoves());
             //Go through the moves and remove the real bad ones
             for (int i = moves.Count-1; i >= 0; i--){
@@ -343,14 +351,17 @@ namespace Gomoku{
                 int beta = int.MaxValue;
                 copy.ChangeSquare(moves[i]);
                 copy.EndTurn();
+                int win = copy.CheckWin(copy.lastMove);
+                if((win == 1 && state.blackTurn) || (win == 2 && !state.blackTurn)){
+                    return new int[]{moves[i]};
+                }
                 int color = copy.blackTurn ? 1 : -1;
-                int value = AlphaBeta(alpha, beta, copy, 2, color);
+                int value = AlphaBeta(alpha, beta, copy, additionalDepth, color);
                 //Console.WriteLine("move " + moves[i] + " val " + value);
                 //Console.Read();
-                if(value > 5000){
+                if(value > 10000){
                     moves.RemoveAt(i);
-                } else if(value < -5000){
-                    state.DebugWrite("Winning move " + moves[i] + " found!");
+                } else if(value < -10000){
                     return new int[]{moves[i]};
                 }
             }
@@ -381,7 +392,6 @@ namespace Gomoku{
             return moves.ToArray();
         }
 
-        //TODO: Create function that finds new moves in row created by last move.
         public int[] FindMovesInRow(Board state, int pos, int dirX, int dirY){
             int inRow = 1;
             List<int> moves = new List<int>();
